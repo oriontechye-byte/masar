@@ -30,8 +30,11 @@
             <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">لوحة التحكم</a>
             <a href="{{ route('admin.students.index') }}" class="{{ request()->routeIs('admin.students.*') ? 'active' : '' }}">إدارة الطلاب</a>
             <a href="{{ route('admin.questions.index') }}" class="{{ request()->routeIs('admin.questions.*') ? 'active' : '' }}">إدارة الأسئلة</a>
-            {{-- This is the newly added link --}}
             <a href="{{ route('admin.types.index') }}" class="{{ request()->routeIs('admin.types.*') ? 'active' : '' }}">إدارة أنواع الذكاء</a>
+            
+            {{-- ***** هذه هي الإضافة الجديدة ***** --}}
+            <a href="{{ route('admin.profile.edit') }}" class="{{ request()->routeIs('admin.profile.*') ? 'active' : '' }}">إعدادات الحساب</a>
+            {{-- ***** نهاية الإضافة ***** --}}
         </nav>
     </div>
 
@@ -50,4 +53,3 @@
     </main>
 </body>
 </html>
-
