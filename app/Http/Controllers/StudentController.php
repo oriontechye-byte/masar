@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Student;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class StudentController extends Controller
 {
@@ -14,7 +15,6 @@ class StudentController extends Controller
      */
     public function showRegistrationForm()
     {
-        // Data for dropdowns
         $governorates = [
             'أمانة العاصمة', 'صنعاء', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
             'لحج', 'أبين', 'شبوة', 'المهرة', 'مأرب', 'الجوف', 'البيضاء', 'حجة',
@@ -32,36 +32,29 @@ class StudentController extends Controller
      */
     public function register(Request $request)
     {
-        // Renaming fields for validation to match the database columns
-        $request->merge([
-            'name' => $request->input('full_name'),
-            'grade' => $request->input('gpa'),
-        ]);
-
         $validatedData = $request->validate([
-            'name' => 'required|string|max:255',
+            'full_name' => 'required|string|max:255',
             'whatsapp_number' => 'required|string|max:20|unique:students,whatsapp_number',
             'email' => 'nullable|email|max:255',
             'governorate' => 'required|string|max:255',
-            'grade' => 'required|numeric|min:0|max:100',
+            'gpa' => 'required|numeric|min:0|max:100',
             'graduation_year' => 'required|integer',
         ], [
-            'name.required' => 'حقل الاسم الكامل مطلوب.',
+            'full_name.required' => 'حقل الاسم الكامل مطلوب.',
             'whatsapp_number.required' => 'حقل رقم الهاتف مطلوب.',
             'whatsapp_number.unique' => 'رقم الهاتف هذا مسجل بالفعل.',
             'governorate.required' => 'حقل المحافظة مطلوب.',
-            'grade.required' => 'حقل المعدل مطلوب.',
-            'grade.numeric' => 'حقل المعدل يجب أن يكون رقماً صحيحاً أو عشرياً.',
+            'gpa.required' => 'حقل المعدل مطلوب.',
+            'gpa.numeric' => 'حقل المعدل يجب أن يكون رقماً صحيحاً أو عشرياً.',
             'graduation_year.required' => 'حقل سنة التخرج مطلوب.',
         ]);
 
-        // We already merged 'name' and 'grade', so they are available in validatedData
-        $student = Student::create($validatedData);
+        // --- **هذا هو التعديل الرئيسي** ---
+        // 1. لا ننشئ الطالب هنا، بل نخزن بياناته مؤقتاً في الجلسة
+        Session::put('student_registration_data', $validatedData);
+        Session::put('test_type_for_test', 'pre'); // نحدد أن هذا هو الاختبار القبلي
 
-        // Store student ID in session to start the test
-        Session::put('student_id', $student->id);
-        Session::put('test_type', 'pre_test'); // Mark as pre-test
-
+        // 2. نوجه الطالب لصفحة الاختبار برابط نظيف
         return redirect()->route('test.show');
     }
 
@@ -87,14 +80,13 @@ class StudentController extends Controller
 
         $student = Student::where('whatsapp_number', $validatedData['whatsapp_number'])->first();
 
-        // Check if student has already completed the post-test
-        if ($student->testResult && $student->testResult->post_lecture_scores) {
+        $testResult = $student->testResult;
+        if ($testResult && $testResult->post_score_social !== null) {
             return redirect()->route('results.show', $student->id)->with('info', 'لقد أكملت الاختبار البعدي مسبقاً. هذه هي نتيجتك.');
         }
 
-        // Store student ID and test type in session
-        Session::put('student_id', $student->id);
-        Session::put('test_type', 'post_test'); // Mark as post-test
+        Session::put('student_id_for_test', $student->id);
+        Session::put('test_type_for_test', 'post');
 
         return redirect()->route('test.show');
     }
@@ -104,12 +96,29 @@ class StudentController extends Controller
      */
     public function showStudentResults($student_id)
     {
-        $student = Student::with('testResult.intelligenceType')->findOrFail($student_id);
+        $student = Student::findOrFail($student_id);
+        $result = $student->testResult;
 
-        if (!$student->testResult) {
+        if (!$result) {
             return redirect()->route('landing')->with('error', 'لم يتم العثور على نتائج لهذا الطالب.');
         }
+
+        $intelligenceTypes = \App\Models\IntelligenceType::all()->keyBy('id');
+        $preScores = [];
+        $postScores = null;
+
+        foreach ($intelligenceTypes as $id => $type) {
+            $key = Str::of($type->name)->before(' ')->snake();
+            $preScores[$id] = $result->{'score_' . $key} ?? 0;
+            if ($result->{'post_score_' . $key} !== null) {
+                $postScores[$id] = $result->{'post_score_' . $key};
+            }
+        }
+        arsort($preScores);
+        if($postScores) {
+            arsort($postScores);
+        }
         
-        return view('results', compact('student'));
+        return view('results', compact('student', 'preScores', 'postScores', 'intelligenceTypes'));
     }
 }

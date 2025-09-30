@@ -14,10 +14,13 @@ class TestController extends Controller
      */
     public function showTest()
     {
-        // نتأكد من وجود بيانات الطالب في الجلسة إذا كان الاختبار قبلياً
-        if (request('test_type') == 'pre' && !Session::has('student_registration_data')) {
-            // إذا لم تكن هناك بيانات، نعيده لصفحة التسجيل
-            return redirect('/register')->withErrors(['msg' => 'الرجاء إكمال بيانات التسجيل أولاً.']);
+        // --- تعديل: التحقق من وجود جلسة صالحة للاختبار ---
+        $isPreTest = Session::has('student_registration_data') && Session::get('test_type_for_test') === 'pre';
+        $isPostTest = Session::has('student_id_for_test') && Session::get('test_type_for_test') === 'post';
+
+        // إذا لم تكن هناك أي جلسة صالحة، نعيد المستخدم للصفحة الرئيسية
+        if (!$isPreTest && !$isPostTest) {
+            return redirect()->route('landing')->withErrors(['msg' => 'جلسة الاختبار غير صالحة، يرجى البدء من جديد.']);
         }
         
         $questions = DB::table('questions')->get();
@@ -29,21 +32,16 @@ class TestController extends Controller
      */
     public function calculateResult(Request $request)
     {
-        $testType = $request->input('test_type');
+        // --- تعديل: قراءة البيانات من الجلسة فقط ---
+        $testType = Session::get('test_type_for_test');
         $answers = $request->input('answers');
-        $studentId = $request->input('student_id');
 
-        // -- تعديل مهم: التحقق من وجود بيانات الجلسة للاختبار القبلي --
-        if ($testType === 'pre') {
-            if (!session()->has('student_registration_data')) {
-                // إذا كانت البيانات غير موجودة، نعيد الطالب لصفحة التسجيل مع رسالة واضحة
-                return redirect('/register')->withErrors(['msg' => 'انتهت صلاحية الجلسة، الرجاء تسجيل بياناتك مرة أخرى.']);
-            }
-            $studentData = session('student_registration_data');
+        // إعادة التحقق من بيانات الجلسة
+        if (!$testType) {
+            return redirect()->route('landing')->withErrors(['msg' => 'انتهت صلاحية الجلسة، الرجاء البدء من جديد.']);
         }
-        // -- نهاية التعديل --
-
-        // حساب الدرجات
+        
+        // حساب الدرجات (هذا الجزء يبقى كما هو)
         $questions = DB::table('questions')->get()->keyBy('id');
         $scores = [];
         $typeMap = [
@@ -51,7 +49,6 @@ class TestController extends Controller
             5 => 'logical', 6 => 'naturalist', 7 => 'linguistic', 8 => 'musical'
         ];
         
-        // تهيئة مصفوفة الدرجات
         foreach ($typeMap as $name) {
             $scores[$name] = 0;
         }
@@ -66,8 +63,17 @@ class TestController extends Controller
             }
         }
 
+        $studentId = null; 
+
+        // --- **هذا هو التصحيح الرئيسي للمنطق** ---
         if ($testType === 'pre') {
-            // 1. إنشاء سجل الطالب
+            // 1. نتأكد من وجود بيانات التسجيل المؤقتة
+            if (!Session::has('student_registration_data')) {
+                return redirect('/register')->withErrors(['msg' => 'انتهت صلاحية جلسة التسجيل، الرجاء تسجيل بياناتك مرة أخرى.']);
+            }
+            $studentData = Session::get('student_registration_data');
+
+            // 2. نقوم بإنشاء سجل الطالب **الآن** ونحصل على رقمه
             $studentId = DB::table('students')->insertGetId([
                 'full_name' => $studentData['full_name'],
                 'whatsapp_number' => $studentData['whatsapp_number'],
@@ -79,7 +85,7 @@ class TestController extends Controller
                 'updated_at' => now(),
             ]);
 
-            // 2. إنشاء سجل النتائج
+            // 3. نقوم بإنشاء سجل النتائج للطالب الجديد
             DB::table('test_results')->insert([
                 'student_id' => $studentId,
                 'score_social' => $scores['social'],
@@ -94,10 +100,13 @@ class TestController extends Controller
                 'updated_at' => now(),
             ]);
             
+            // 4. نحذف بيانات التسجيل المؤقتة من الجلسة
             Session::forget('student_registration_data');
 
         } elseif ($testType === 'post') {
-            // إذا كان الاختبار بعدياً، نقوم فقط بتحديث السجل الحالي
+            // في الاختبار البعدي، الطالب موجود بالفعل، لذلك نأخذ رقمه من الجلسة
+            $studentId = Session::get('student_id_for_test');
+
             DB::table('test_results')->where('student_id', $studentId)->update([
                 'post_score_social' => $scores['social'],
                 'post_score_visual' => $scores['visual'],
@@ -111,8 +120,10 @@ class TestController extends Controller
             ]);
         }
 
-        // في كلتا الحالتين، نوجه الطالب لصفحة النتائج الخاصة به
+        // مسح كل بيانات الجلسة المتعلقة بالاختبار
+        Session::forget('student_id_for_test');
+        Session::forget('test_type_for_test');
+
         return redirect()->route('results.show', ['student_id' => $studentId]);
     }
 }
-
