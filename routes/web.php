@@ -17,12 +17,20 @@ use App\Http\Controllers\Admin\ProfileController;
 |--------------------------------------------------------------------------
 */
 Route::get('/', [PageController::class, 'showLandingPage'])->name('landing');
-Route::get('/register', [StudentController::class, 'showRegistrationForm']);
-Route::post('/register', [StudentController::class, 'register']);
-Route::get('/post-test', [StudentController::class, 'showPostTestLookupForm']);
-Route::post('/post-test', [StudentController::class, 'handlePostTestLookup']);
-Route::get('/test', [TestController::class, 'showTest']);
-Route::post('/submit-test', [TestController::class, 'calculateResult']);
+
+// Pre-test registration routes
+Route::get('/register', [StudentController::class, 'showRegistrationForm'])->name('register');
+Route::post('/register', [StudentController::class, 'register'])->name('register.submit');
+
+// Post-test lookup routes
+Route::get('/post-test', [StudentController::class, 'showPostTestLookupForm'])->name('post-test.lookup');
+Route::post('/post-test', [StudentController::class, 'handlePostTestLookup'])->name('post-test.submit');
+
+// Test routes
+Route::get('/test', [TestController::class, 'showTest'])->name('test.show');
+Route::post('/submit-test', [TestController::class, 'calculateResult'])->name('test.submit');
+
+// Results route
 Route::get('/results/{student_id}', [StudentController::class, 'showStudentResults'])->name('results.show');
 
 /*
@@ -54,4 +62,5 @@ Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
     // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::get('/theme/{theme}', [App\Http\Controllers\PageController::class, 'switchTheme'])->name('theme.switch');
 });
