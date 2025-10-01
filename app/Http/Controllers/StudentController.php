@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Student;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\DB;   // ✅ أضفنا الـ Facade
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
@@ -49,12 +50,10 @@ class StudentController extends Controller
             'graduation_year.required' => 'حقل سنة التخرج مطلوب.',
         ]);
 
-        // --- **هذا هو التعديل الرئيسي** ---
-        // 1. لا ننشئ الطالب هنا، بل نخزن بياناته مؤقتاً في الجلسة
+        // نخزن البيانات مؤقتاً للجلسة ونوجه لصفحة الاختبار (اختبار قبلي)
         Session::put('student_registration_data', $validatedData);
-        Session::put('test_type_for_test', 'pre'); // نحدد أن هذا هو الاختبار القبلي
+        Session::put('test_type_for_test', 'pre');
 
-        // 2. نوجه الطالب لصفحة الاختبار برابط نظيف
         return redirect()->route('test.show');
     }
 
@@ -82,7 +81,8 @@ class StudentController extends Controller
 
         $testResult = $student->testResult;
         if ($testResult && $testResult->post_score_social !== null) {
-            return redirect()->route('results.show', $student->id)->with('info', 'لقد أكملت الاختبار البعدي مسبقاً. هذه هي نتيجتك.');
+            return redirect()->route('results.show', $student->id)
+                ->with('info', 'لقد أكملت الاختبار البعدي مسبقاً. هذه هي نتيجتك.');
         }
 
         Session::put('student_id_for_test', $student->id);
@@ -107,18 +107,104 @@ class StudentController extends Controller
         $preScores = [];
         $postScores = null;
 
+        // خريطة الحقول بين النوع ومعرّف العمود في النتائج
+        $typeMap = [
+            1 => 'social',
+            2 => 'visual',
+            3 => 'intrapersonal',
+            4 => 'kinesthetic',
+            5 => 'logical',
+            6 => 'naturalist',
+            7 => 'linguistic',
+            8 => 'musical',
+        ];
+
         foreach ($intelligenceTypes as $id => $type) {
-            $key = Str::of($type->name)->before(' ')->snake();
-            $preScores[$id] = $result->{'score_' . $key} ?? 0;
-            if ($result->{'post_score_' . $key} !== null) {
-                $postScores[$id] = $result->{'post_score_' . $key};
+            $key = $typeMap[$id] ?? null;
+            if ($key) {
+                $preScores[$id] = $result->{'score_' . $key} ?? 0;
+                if ($result->{'post_score_' . $key} !== null) {
+                    $postScores[$id] = $result->{'post_score_' . $key};
+                }
             }
         }
+
+        // ترتيب تنازلي
         arsort($preScores);
-        if($postScores) {
+        if ($postScores) {
             arsort($postScores);
         }
-        
-        return view('results', compact('student', 'preScores', 'postScores', 'intelligenceTypes'));
+
+        // نحدد المصفوفة المعروضة (بعدي إن وجد، وإلا قبلي)
+        $scores = $postScores ?? $preScores;
+
+        // === 1) نحسب عدد الأسئلة لكل نوع (من جدول الأسئلة) ===
+        $questions = DB::table('questions')
+            ->select('id', 'intelligence_type_id')
+            ->get();
+
+        $countsByKey = array_fill_keys(array_values($typeMap), 0);
+        foreach ($questions as $q) {
+            $key = $typeMap[$q->intelligence_type_id] ?? null;
+            if ($key) $countsByKey[$key]++;
+        }
+
+        // أعلى درجة ممكنة للسؤال (0/1/2)
+        $maxChoice = 2;
+
+        // === 2) جهّز الدرجات الخام ===
+        $preRaw = [];
+        $postRaw = [];
+        foreach ($intelligenceTypes as $id => $type) {
+            $key = $typeMap[$id] ?? null;
+            if (!$key) continue;
+
+            $preVal = (int)($result->{'score_' . $key} ?? 0);
+            $postVal = $result->{'post_score_' . $key} ?? null;
+
+            $preRaw[$id] = $preVal;
+            if (!is_null($postVal)) {
+                $postRaw[$id] = (int)$postVal;
+            }
+        }
+
+        // === 3) حوّل الخام إلى نسب مئوية (0..100) لكل فرع ===
+        $prePercents = [];
+        $postPercents = null;
+
+        foreach ($intelligenceTypes as $id => $type) {
+            $key = $typeMap[$id] ?? null;
+            if (!$key) continue;
+
+            $maxForThis = $countsByKey[$key] * $maxChoice;
+            $prePercents[$id] = $maxForThis > 0
+                ? round(($preRaw[$id] / $maxForThis) * 100)
+                : 0;
+
+            if ($postScores) {
+                $val = $postRaw[$id] ?? null;
+                if (!is_null($val)) {
+                    $postPercents[$id] = $maxForThis > 0
+                        ? round(($val / $maxForThis) * 100)
+                        : 0;
+                }
+            }
+        }
+
+        // نستخدم النسب في العرض
+        $scores = $postPercents ?? $prePercents;
+
+        // إعادة الترتيب تنازلي
+        arsort($scores);
+
+        return view('results', compact(
+            'student',
+            'preScores',
+            'postScores',
+            'intelligenceTypes',
+            'scores',
+            'prePercents',
+            'postPercents'
+        ));
     }
 }
