@@ -22,5 +22,6 @@ class RedirectIfAuthenticated
 
         // If not logged in, allow them to see the page (e.g., login or register)
         return $next($request);
+        
     }
 }

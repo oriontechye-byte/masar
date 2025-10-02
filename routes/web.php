@@ -10,6 +10,8 @@ use App\Http\Controllers\Admin\QuestionController;
 use App\Http\Controllers\Admin\IntelligenceTypeController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\Admin\ProfileController;
+// NOTE: ما عد نحتاج ResultsController الخاص بتصدير PDF
+// use App\Http\Controllers\ResultsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,20 +20,27 @@ use App\Http\Controllers\Admin\ProfileController;
 */
 Route::get('/', [PageController::class, 'showLandingPage'])->name('landing');
 
-// Pre-test registration routes
+/* تسجيل قبلي */
 Route::get('/register', [StudentController::class, 'showRegistrationForm'])->name('register');
 Route::post('/register', [StudentController::class, 'register'])->name('register.submit');
 
-// Post-test lookup routes
+/* البحث للاختبار البعدي */
 Route::get('/post-test', [StudentController::class, 'showPostTestLookupForm'])->name('post-test.lookup');
 Route::post('/post-test', [StudentController::class, 'handlePostTestLookup'])->name('post-test.submit');
 
-// Test routes
+/* صفحة الاختبار (تعتمد على نوعه من الجلسة: قبلي/بعدي) */
 Route::get('/test', [TestController::class, 'showTest'])->name('test.show');
 Route::post('/submit-test', [TestController::class, 'calculateResult'])->name('test.submit');
 
-// Results route
-Route::get('/results/{student_id}', [StudentController::class, 'showStudentResults'])->name('results.show');
+/* النتائج الاعتيادية للطالب */
+Route::get('/results/{student_id}', [StudentController::class, 'showStudentResults'])
+    ->whereNumber('student_id')
+    ->name('results.show');
+
+/* تقرير التطوّر (بعد إكمال البعدي) */
+Route::get('/growth-report/{student_id}', [StudentController::class, 'showGrowthReport'])
+    ->whereNumber('student_id')
+    ->name('growth.report');
 
 /*
 |--------------------------------------------------------------------------
@@ -43,24 +52,33 @@ Route::post('/admin/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
-    
+
+    /* لوحة التحكم */
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    
-    // Students Management
+
+    /* إدارة الطلاب */
     Route::get('/students', [AdminStudentController::class, 'index'])->name('students.index');
-    Route::get('/students/{student}', [AdminStudentController::class, 'show'])->name('students.show');
+    Route::get('/students/{student}', [AdminStudentController::class, 'show'])
+        ->whereNumber('student')
+        ->name('students.show');
     Route::get('/students/export', [AdminStudentController::class, 'export'])->name('students.export');
 
-    // Questions Management
+    /* إدارة الأسئلة */
     Route::resource('questions', QuestionController::class)->except(['show']);
 
-    // Intelligence Types Management
+    /* إدارة أنواع الذكاء */
     Route::get('/types', [IntelligenceTypeController::class, 'index'])->name('types.index');
-    Route::get('/types/{id}/edit', [IntelligenceTypeController::class, 'edit'])->name('types.edit');
-    Route::put('/types/{id}', [IntelligenceTypeController::class, 'update'])->name('types.update');
+    Route::get('/types/{id}/edit', [IntelligenceTypeController::class, 'edit'])
+        ->whereNumber('id')
+        ->name('types.edit');
+    Route::put('/types/{id}', [IntelligenceTypeController::class, 'update'])
+        ->whereNumber('id')
+        ->name('types.update');
 
-    // Profile Routes
+    /* الملف الشخصي + الثيم */
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::get('/theme/{theme}', [App\Http\Controllers\PageController::class, 'switchTheme'])->name('theme.switch');
+    Route::get('/theme/{theme}', [PageController::class, 'switchTheme'])->name('theme.switch');
+
+    // NOTE: حذفت مسار /results/{student}/pdf الخاص بالتصدير لأنه اتلغى
 });
