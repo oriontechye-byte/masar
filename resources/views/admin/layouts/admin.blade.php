@@ -79,7 +79,7 @@
   <div class="sidebar">
     <h2><i class="fa-solid fa-brain"></i> مشروع مسار</h2>
     <nav class="sidebar-nav">
-      <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.dashboard') ? 'active' : '' }}"><i class="fa-solid fa-gauge"></i> لوحة التحكم</a>
+      <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs(patterns: 'admin.dashboard') ? 'active' : '' }}"><i class="fa-solid fa-gauge"></i> لوحة التحكم</a>
       <a href="{{ route('admin.students.index') }}" class="{{ request()->routeIs('admin.students.*') ? 'active' : '' }}"><i class="fa-solid fa-user-graduate"></i> إدارة الطلاب</a>
       <a href="{{ route('admin.questions.index') }}" class="{{ request()->routeIs('admin.questions.*') ? 'active' : '' }}"><i class="fa-regular fa-circle-question"></i> إدارة الأسئلة</a>
       <a href="{{ route('admin.types.index') }}" class="{{ request()->routeIs('admin.types.*') ? 'active' : '' }}"><i class="fa-solid fa-brain"></i> إدارة أنواع الذكاء</a>

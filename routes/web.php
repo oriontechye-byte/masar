@@ -10,8 +10,7 @@ use App\Http\Controllers\Admin\QuestionController;
 use App\Http\Controllers\Admin\IntelligenceTypeController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\Admin\ProfileController;
-// NOTE: ما عد نحتاج ResultsController الخاص بتصدير PDF
-// use App\Http\Controllers\ResultsController;
+use App\Http\Controllers\Admin\SettingsController; // للتحكم العام بالاختبار البعدي
 
 /*
 |--------------------------------------------------------------------------
@@ -20,15 +19,15 @@ use App\Http\Controllers\Admin\ProfileController;
 */
 Route::get('/', [PageController::class, 'showLandingPage'])->name('landing');
 
-/* تسجيل قبلي */
+/* التسجيل (الاختبار القبلي) */
 Route::get('/register', [StudentController::class, 'showRegistrationForm'])->name('register');
 Route::post('/register', [StudentController::class, 'register'])->name('register.submit');
 
-/* البحث للاختبار البعدي */
+/* البحث/الدخول للاختبار البعدي */
 Route::get('/post-test', [StudentController::class, 'showPostTestLookupForm'])->name('post-test.lookup');
 Route::post('/post-test', [StudentController::class, 'handlePostTestLookup'])->name('post-test.submit');
 
-/* صفحة الاختبار (تعتمد على نوعه من الجلسة: قبلي/بعدي) */
+/* صفحة الاختبار (تحدد من الجلسة قبلي/بعدي) */
 Route::get('/test', [TestController::class, 'showTest'])->name('test.show');
 Route::post('/submit-test', [TestController::class, 'calculateResult'])->name('test.submit');
 
@@ -63,6 +62,15 @@ Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
         ->name('students.show');
     Route::get('/students/export', [AdminStudentController::class, 'export'])->name('students.export');
 
+    // التحكم الفردي بسماح الاختبار البعدي لطالب معيّن (إن وُجد زر في صفحة الطالب)
+    Route::post('/students/{student}/toggle-post-test', [AdminStudentController::class, 'togglePostTest'])
+        ->whereNumber('student')
+        ->name('students.toggle_post_test');
+
+    // السماح/الإلغاء جماعيًا (مثلاً حسب المحافظة عند استخدام الفلاتر في الواجهة)
+    Route::post('/students/bulk/allow-post-test', [AdminStudentController::class, 'bulkAllowPostTest'])
+        ->name('students.bulk_allow_post_test');
+
     /* إدارة الأسئلة */
     Route::resource('questions', QuestionController::class)->except(['show']);
 
@@ -80,5 +88,7 @@ Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('/theme/{theme}', [PageController::class, 'switchTheme'])->name('theme.switch');
 
-    // NOTE: حذفت مسار /results/{student}/pdf الخاص بالتصدير لأنه اتلغى
+    /* التحكم العام في الاختبار البعدي (يفتح/يقفل للجميع) */
+    Route::post('/settings/toggle-post-test-global', [SettingsController::class, 'togglePostTestGlobal'])
+        ->name('settings.toggle_post_test_global');
 });

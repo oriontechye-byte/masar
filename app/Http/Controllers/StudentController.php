@@ -7,15 +7,27 @@ use App\Models\Student;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Schema;
+use App\Models\SiteSetting;
 
 class StudentController extends Controller
 {
     /**
-     * عرض نموذج تسجيل الطالب (اختبار قبلي)
+     * هل الاختبار البعدي مفتوح عالميًا؟
+     */
+    protected function isPostTestGloballyEnabled(): bool
+    {
+        if (!Schema::hasTable('site_settings')) {
+            return false;
+        }
+        return SiteSetting::get('post_test_global_enabled', '0') === '1';
+    }
+
+    /**
+     * نموذج التسجيل (اختبار قبلي)
      */
     public function showRegistrationForm()
     {
-        // قائمة المحافظات + سنوات التخرج (آخر 10 سنوات)
         $governorates = [
             'أمانة العاصمة', 'صنعاء', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
             'لحج', 'أبين', 'شبوة', 'المهرة', 'مأرب', 'الجوف', 'البيضاء', 'حجة',
@@ -29,11 +41,10 @@ class StudentController extends Controller
     }
 
     /**
-     * حفظ بيانات التسجيل للجلسة ثم التوجيه لصفحة الاختبار (قبلي)
+     * حفظ التسجيل وإرسال الطالب للاختبار القبلي
      */
     public function register(Request $request)
     {
-        // التحقق من البيانات الأساسية للتسجيل
         $validatedData = $request->validate([
             'full_name'        => 'required|string|max:255',
             'whatsapp_number'  => 'required|string|max:20|unique:students,whatsapp_number',
@@ -51,7 +62,6 @@ class StudentController extends Controller
             'graduation_year.required' => 'حقل سنة التخرج مطلوب.',
         ]);
 
-        // نحفظ بيانات الطالب مؤقتاً ونعرف أن نوع الاختبار "قبلي"
         Session::put('student_registration_data', $validatedData);
         Session::put('test_type_for_test', 'pre');
 
@@ -59,19 +69,27 @@ class StudentController extends Controller
     }
 
     /**
-     * نموذج البحث للدخول للاختبار البعدي
+     * نموذج البحث للاختبار البعدي
      */
     public function showPostTestLookupForm()
     {
-        return view('post_test_lookup');
+        if (!$this->isPostTestGloballyEnabled()) {
+            return view('post_test_locked'); // صفحة القفل العام
+        }
+
+        return view('post_test_lookup');     // نموذج إدخال الرقم
     }
 
     /**
-     * التحقق من رقم الطالب وتوجيهه للاختبار البعدي
+     * التحقق من رقم الهاتف وإرسال الطالب للاختبار البعدي
      */
     public function handlePostTestLookup(Request $request)
     {
-        // نتحقق بالرقم (الرسائل تقول "رقم الهاتف")
+        // حماية من الدخول المباشر عند القفل العام
+        if (!$this->isPostTestGloballyEnabled()) {
+            return view('post_test_locked');
+        }
+
         $validatedData = $request->validate([
             'whatsapp_number' => 'required|string|exists:students,whatsapp_number',
         ], [
@@ -81,14 +99,42 @@ class StudentController extends Controller
 
         $student = Student::where('whatsapp_number', $validatedData['whatsapp_number'])->first();
 
-        // لو الطالب أكمل البعدي سابقاً نرجّعه للنتيجة
-        $testResult = $student->testResult;
-        if ($testResult && $testResult->post_score_social !== null) {
-            return redirect()->route('results.show', $student->id)
-                ->with('info', 'لقد أكملت الاختبار البعدي مسبقاً. هذه هي نتيجتك.');
+        // ✅ لازم يكون عنده اختبار قبلي (سجل نتائج موجود)
+        $result = $student->testResult;
+        if (!$result) {
+            return back()->withErrors([
+                'whatsapp_number' => 'لا يمكنك دخول الاختبار البعدي قبل إكمال الاختبار القبلي.'
+            ])->withInput();
         }
 
-        // إعداد الجلسة للاختبار البعدي
+        // ✅ إذا الطالب أنهى البعدي سابقًا → أرسله لتقرير التطور مباشرة
+        $hasPost = collect([
+            $result->post_score_social,
+            $result->post_score_visual,
+            $result->post_score_intrapersonal,
+            $result->post_score_kinesthetic,
+            $result->post_score_logical,
+            $result->post_score_naturalist,
+            $result->post_score_linguistic,
+            $result->post_score_musical,
+        ])->filter(fn($v) => !is_null($v))->isNotEmpty();
+
+        if ($hasPost) {
+            return redirect()->route('growth.report', $student->id)
+                ->with('info', 'لقد أكملت الاختبار البعدي سابقًا — هذا تقرير تطوّرك.');
+        }
+
+        // ✅ عند الفتح العام، نتجاهل post_test_allowed الفردي ونسمح للجميع
+        // لو حبيت تفعّل الشرط الفردي حتى مع الفتح العام، أزل التعليق أدناه:
+        /*
+        if (Schema::hasColumn('students', 'post_test_allowed') && !$student->post_test_allowed) {
+            return back()
+                ->withErrors(['whatsapp_number' => 'لم يتم فتح الاختبار البعدي لهذا الطالب بعد.'])
+                ->withInput();
+        }
+        */
+
+        // ✅ تجهيز الجلسة للاختبار البعدي
         Session::put('student_id_for_test', $student->id);
         Session::put('test_type_for_test', 'post');
 
@@ -96,9 +142,7 @@ class StudentController extends Controller
     }
 
     /**
-     * صفحة النتائج الاعتيادية
-     * ملاحظة مهمّة: الحقول score_* و post_score_* مخزنة أصلاً كنِسب (0..100)
-     * لذلك نقرأها مباشرة مع clamp لضمان النطاق، بدون تحويل إضافي.
+     * عرض النتائج الاعتيادية (تقرأ القيم المئوية المخزّنة مباشرة)
      */
     public function showStudentResults($student_id)
     {
@@ -111,7 +155,7 @@ class StudentController extends Controller
 
         $intelligenceTypes = \App\Models\IntelligenceType::all()->keyBy('id');
 
-        // خريطة الحقول
+        // خريطة الحقول حسب IDs
         $typeMap = [
             1 => 'social',
             2 => 'visual',
@@ -161,14 +205,10 @@ class StudentController extends Controller
     }
 
     /**
-     * تقرير التطوّر (بعد الاختبار البعدي)
-     * - كل شيء يُقرأ كنسب مخزّنة (0..100) مع clamp، بلا إعادة تحويل ثانية.
-     * - يبني $tableRows للجدول، $topThree لأعلى 3 ذكاءات،
-     *   و $topSkills (أعلى 3 مهارات/مسارات) قبل الذكاءات.
+     * تقرير التطوّر (بعد البعدي)
      */
     public function showGrowthReport($student_id)
     {
-        // (1) الطالب + نتيجته
         $student = Student::findOrFail($student_id);
         $result  = $student->testResult;
 
@@ -176,10 +216,8 @@ class StudentController extends Controller
             return redirect()->route('landing')->with('error', 'لم يتم العثور على نتائج لهذا الطالب.');
         }
 
-        // (2) أنواع الذكاء مفهرسة
         $intelligenceTypes = \App\Models\IntelligenceType::all()->keyBy('id');
 
-        // (3) خريطة الحقول
         $typeMap = [
             1 => 'social',
             2 => 'visual',
@@ -193,7 +231,6 @@ class StudentController extends Controller
 
         $clamp = fn($v) => max(0, min(100, (int)$v));
 
-        // (4) قراءة (قبلي/بعدي) من المخزن مباشرة
         $prePercents  = [];
         $postPercents = [];
         $hasAnyPost   = false;
@@ -214,13 +251,11 @@ class StudentController extends Controller
             }
         }
 
-        // (5) إن لم يوجد أي بعدي -> نرجّع الطالب لنتيجته
         if (!$hasAnyPost) {
             return redirect()->route('results.show', $student->id)
                 ->with('info', 'لا يمكن عرض تقرير التطوّر قبل إكمال الاختبار البعدي.');
         }
 
-        // (6) مقدار التغيّر لكل نوع
         $growth = [];
         foreach ($intelligenceTypes as $id => $type) {
             $pre  = $prePercents[$id]  ?? 0;
@@ -228,7 +263,6 @@ class StudentController extends Controller
             $growth[$id] = is_null($post) ? null : ($post - $pre);
         }
 
-        // (7) صفوف الجدول
         $tableRows = [];
         foreach ($intelligenceTypes as $id => $type) {
             $tableRows[] = [
@@ -240,7 +274,7 @@ class StudentController extends Controller
             ];
         }
 
-        // (8) أعلى 3 ذكاءات (حسب بعدي)
+        // أعلى 3 ذكاءات حسب البعدي
         $postForSort = [];
         foreach ($postPercents as $id => $val) {
             if (!is_null($val)) $postForSort[$id] = $val;
@@ -252,7 +286,6 @@ class StudentController extends Controller
         foreach ($top3Ids as $id) {
             $type = $intelligenceTypes[$id];
 
-            // careers: نفصلها بفواصل عربية/إنجليزية
             $careersText = (string) ($type->careers ?? '');
             $careers = collect(preg_split('/[,،]+/u', $careersText))
                 ->map(fn($s) => trim($s))
@@ -275,8 +308,8 @@ class StudentController extends Controller
         }
         $topThree = $top3;
 
-        // (9) أعلى 3 مهارات/مسارات مناسبة — نقيّم كل مسار بنسبة الذكاء البعدي المرتبط
-        $skillScores = []; // name => ['score'=>.., 'source_id'=>..]
+        // أعلى 3 مسارات/مهارات
+        $skillScores = [];
         foreach ($intelligenceTypes as $id => $type) {
             $post = $postPercents[$id] ?? null;
             if (is_null($post)) continue;
@@ -294,7 +327,6 @@ class StudentController extends Controller
                 }
             }
         }
-        // ترتيب وأخذ أفضل 3
         uasort($skillScores, fn($a,$b)=> $b['score'] <=> $a['score']);
         $topSkills = [];
         $picked = 0;
@@ -308,7 +340,7 @@ class StudentController extends Controller
             if (++$picked === 3) break;
         }
 
-        // (10) بيانات الرسم البياني (لو رجّعته لاحقًا)
+        // بيانات الرسم البياني (اختياريًا)
         $chartLabels = [];
         $chartPre    = [];
         $chartPost   = [];
@@ -318,17 +350,16 @@ class StudentController extends Controller
             $chartPost[]   = is_null($postPercents[$id]) ? 0 : (int)$postPercents[$id];
         }
 
-        // (11) تمرير البيانات للواجهة
         return view('growth_report', [
             'student'           => $student,
             'intelligenceTypes' => $intelligenceTypes,
             'prePercents'       => $prePercents,
             'postPercents'      => $postPercents,
             'growth'            => $growth,
-            'tableRows'         => $tableRows,   // للجدول
+            'tableRows'         => $tableRows,
             'top3'              => $top3,
-            'topThree'          => $topThree,    // بطاقات أعلى 3 ذكاءات
-            'topSkills'         => $topSkills,   // ✅ بطاقات أعلى 3 مهارات/مسارات
+            'topThree'          => $topThree,
+            'topSkills'         => $topSkills,
             'chartLabels'       => $chartLabels,
             'chartPre'          => $chartPre,
             'chartPost'         => $chartPost,
@@ -336,7 +367,7 @@ class StudentController extends Controller
     }
 
     /**
-     * تصدير PDF — نستخدم القيم المئوية المخزّنة مباشرة (0..100)
+     * تصدير PDF (تستخدم القيم المئوية المخزّنة 0..100)
      */
     public function exportPdf($student_id)
     {
@@ -362,7 +393,6 @@ class StudentController extends Controller
 
         $clamp = fn($v) => max(0, min(100, (int)$v));
 
-        // نقرأ المئويّات مباشرة
         $prePercents  = [];
         $postPercents = null;
 

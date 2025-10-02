@@ -31,4 +31,7 @@ class Student extends Model
     {
         return $this->hasOne(TestResult::class);
     }
+    protected $casts = [
+    'post_test_allowed' => 'boolean',
+];
 }
