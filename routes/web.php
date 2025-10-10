@@ -36,6 +36,11 @@ Route::get('/results/{student_id}', [StudentController::class, 'showStudentResul
     ->whereNumber('student_id')
     ->name('results.show');
 
+/* ✅ تصدير النتائج PDF */
+Route::get('/results/{student_id}/pdf', [StudentController::class, 'exportPdf'])
+    ->whereNumber('student_id')
+    ->name('results.pdf');
+
 /* تقرير التطوّر (بعد إكمال البعدي) */
 Route::get('/growth-report/{student_id}', [StudentController::class, 'showGrowthReport'])
     ->whereNumber('student_id')
@@ -56,11 +61,15 @@ Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     /* إدارة الطلاب */
+    // ⚠️ ضع export قبل الراوت الديناميكي لتجنب التداخل
     Route::get('/students', [AdminStudentController::class, 'index'])->name('students.index');
+    Route::get('/students/export', [AdminStudentController::class, 'export'])->name('students.export');
     Route::get('/students/{student}', [AdminStudentController::class, 'show'])
         ->whereNumber('student')
         ->name('students.show');
-    Route::get('/students/export', [AdminStudentController::class, 'export'])->name('students.export');
+    Route::delete('/students/{student}', [AdminStudentController::class, 'destroy'])
+        ->whereNumber('student')
+        ->name('students.destroy');
 
     // التحكم الفردي بسماح الاختبار البعدي لطالب معيّن (إن وُجد زر في صفحة الطالب)
     Route::post('/students/{student}/toggle-post-test', [AdminStudentController::class, 'togglePostTest'])
