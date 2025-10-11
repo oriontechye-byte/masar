@@ -25,26 +25,27 @@ Route::post('/register', [StudentController::class, 'register'])->name('register
 
 /* البحث/الدخول للاختبار البعدي */
 Route::get('/post-test', [StudentController::class, 'showPostTestLookupForm'])->name('post-test.lookup');
-Route::post('/post-test', [StudentController::class, 'handlePostTestLookup'])->name('post-test.submit');
+Route::post('/post-test', [StudentController::class, 'handlePostTestLookup'])
+    ->middleware('throttle:5,1') // ✅ خمس محاولات لكل دقيقة
+    ->name('post-test.submit');
 
 /* صفحة الاختبار (تحدد من الجلسة قبلي/بعدي) */
 Route::get('/test', [TestController::class, 'showTest'])->name('test.show');
 Route::post('/submit-test', [TestController::class, 'calculateResult'])->name('test.submit');
 
-/* النتائج الاعتيادية للطالب */
-Route::get('/results/{student_id}', [StudentController::class, 'showStudentResults'])
-    ->whereNumber('student_id')
+/* ===================== الطالب (بدون معرّف في الرابط) ===================== */
+Route::get('/results', [StudentController::class, 'showOwnResults'])
+    ->middleware('owns.result')
     ->name('results.show');
 
-/* ✅ تصدير النتائج PDF */
-Route::get('/results/{student_id}/pdf', [StudentController::class, 'exportPdf'])
-    ->whereNumber('student_id')
+Route::get('/results/pdf', [StudentController::class, 'exportOwnPdf'])
+    ->middleware('owns.result')
     ->name('results.pdf');
 
-/* تقرير التطوّر (بعد إكمال البعدي) */
-Route::get('/growth-report/{student_id}', [StudentController::class, 'showGrowthReport'])
-    ->whereNumber('student_id')
+Route::get('/growth-report', [StudentController::class, 'showOwnGrowthReport'])
+    ->middleware('owns.result')
     ->name('growth.report');
+/* ======================================================================== */
 
 /*
 |--------------------------------------------------------------------------
@@ -52,16 +53,21 @@ Route::get('/growth-report/{student_id}', [StudentController::class, 'showGrowth
 |--------------------------------------------------------------------------
 */
 Route::get('/admin/login', [LoginController::class, 'showLoginForm'])->name('login');
-Route::post('/admin/login', [LoginController::class, 'login']);
+
+/* 🛡️ تقييد محاولات تسجيل الدخول */
+Route::post('/admin/login', [LoginController::class, 'login'])
+    ->middleware('throttle:login')
+    ->name('admin.login.attempt');
+
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
+/* ✅ قفل لوحات الإدارة على المستخدمين بدور admin فقط */
+Route::prefix('admin')->middleware(['auth', 'auth.admin'])->name('admin.')->group(function () {
 
     /* لوحة التحكم */
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     /* إدارة الطلاب */
-    // ⚠️ ضع export قبل الراوت الديناميكي لتجنب التداخل
     Route::get('/students', [AdminStudentController::class, 'index'])->name('students.index');
     Route::get('/students/export', [AdminStudentController::class, 'export'])->name('students.export');
     Route::get('/students/{student}', [AdminStudentController::class, 'show'])
@@ -71,12 +77,12 @@ Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
         ->whereNumber('student')
         ->name('students.destroy');
 
-    // التحكم الفردي بسماح الاختبار البعدي لطالب معيّن (إن وُجد زر في صفحة الطالب)
+    // التحكم الفردي بسماح الاختبار البعدي لطالب معيّن
     Route::post('/students/{student}/toggle-post-test', [AdminStudentController::class, 'togglePostTest'])
         ->whereNumber('student')
         ->name('students.toggle_post_test');
 
-    // السماح/الإلغاء جماعيًا (مثلاً حسب المحافظة عند استخدام الفلاتر في الواجهة)
+    // السماح/الإلغاء جماعيًا
     Route::post('/students/bulk/allow-post-test', [AdminStudentController::class, 'bulkAllowPostTest'])
         ->name('students.bulk_allow_post_test');
 
@@ -97,7 +103,7 @@ Route::prefix('admin')->middleware('auth')->name('admin.')->group(function () {
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::get('/theme/{theme}', [PageController::class, 'switchTheme'])->name('theme.switch');
 
-    /* التحكم العام في الاختبار البعدي (يفتح/يقفل للجميع) */
+    /* التحكم العام في الاختبار البعدي */
     Route::post('/settings/toggle-post-test-global', [SettingsController::class, 'togglePostTestGlobal'])
         ->name('settings.toggle_post_test_global');
 });

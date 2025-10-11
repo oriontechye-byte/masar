@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>تقرير تطوّرك - مشروع مسار</title>
 
+  <!-- ملاحظة: لو عندك CSP صارمة، قد تحتاج السماح لـ fonts.googleapis.com و fonts.gstatic.com و cdnjs.cloudflare.com -->
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
 
@@ -63,7 +64,7 @@
     .top-card.best .badge{background:linear-gradient(135deg,#ffd54f,#ffb300); color:#222}
     .top-card.best .bar>span{background:linear-gradient(90deg,#ffd54f,#ffb300)}
 
-    .actions{display:flex; gap:8px; justify-content:flex-end}
+    .actions{display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap}
     .btn{padding:10px 14px; border:none; border-radius:999px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:8px; text-decoration:none}
     .btn-primary{background:#fff; color:#e67e22}
     .btn-outline{background:transparent; color:#fff; border:2px solid rgba(255,255,255,.6)}
@@ -100,7 +101,10 @@
         مشروع مسار
       </a>
       <div style="display:flex; align-items:center; gap:12px">
-        <a href="{{ route('results.show', $student->id) }}" class="btn btn-outline"><i class="fa-solid fa-rotate-left"></i> رجوع للنتيجة</a>
+        <!-- رجوع للنتيجة بدون أي ID -->
+        <a href="{{ route('results.show') }}" class="btn btn-outline"><i class="fa-solid fa-rotate-left"></i> رجوع للنتيجة</a>
+        <!-- تحميل PDF بدون ID (اختياري) -->
+        <a href="{{ route('results.pdf') }}" class="btn btn-outline"><i class="fa-solid fa-file-pdf"></i> تحميل PDF</a>
         <i class="fas fa-moon dark-toggle" id="darkToggle" aria-label="تبديل الوضع"></i>
       </div>
     </div>
@@ -130,7 +134,6 @@
                 <span class="badge"><i class="fa-solid fa-percent"></i> {{ $t['post_percent'] }}%</span>
               </div>
 
-              {{-- تم استبدال الـ inline style بقيمة data-width لإزالة التحذير --}}
               <div class="bar" aria-hidden="true">
                 <span data-width="{{ $t['post_percent'] }}%"></span>
               </div>
@@ -264,7 +267,7 @@
       });
     })();
 
-    // تعبئة عرض الأشرطة من data-width (بدون inline style)
+    // تعبئة عرض الأشرطة من data-width
     window.addEventListener('load', () => {
       document.querySelectorAll('.bar > span').forEach((el) => {
         const target = el.getAttribute('data-width') || '0%';

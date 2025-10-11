@@ -23,12 +23,11 @@ class TestController extends Controller
                 ->withErrors(['msg' => 'جلسة الاختبار غير صالحة، يرجى البدء من جديد.']);
         }
 
-        // ✅ لو بختبر بعدي، لازم يكون عنده سجل قبلي فعلاً
+        // لو بختبر بعدي، لازم يكون عنده سجل قبلي
         if ($isPostTest) {
             $studentId = (int) Session::get('student_id_for_test');
             $hasPre = DB::table('test_results')->where('student_id', $studentId)->exists();
             if (!$hasPre) {
-                // رجّعه لصفحة البحث مع رسالة
                 return redirect()->route('post-test.lookup')
                     ->withErrors(['whatsapp_number' => 'لا يمكنك دخول الاختبار البعدي قبل إكمال الاختبار القبلي.']);
             }
@@ -75,12 +74,14 @@ class TestController extends Controller
         $raw = array_fill_keys(array_values($typeMap), 0);
 
         foreach ($answers as $qid => $val) {
-            if (!isset($questions[$qid])) continue;
-            $q = $questions[$qid];
+            // تحقق من الأرقام وصحة السؤال
+            if (!is_numeric($qid) || !isset($questions[$qid])) continue;
 
+            $q = $questions[$qid];
             $typeKey = $typeMap[$q->intelligence_type_id] ?? null;
             if ($typeKey === null) continue;
 
+            // قيّم ضمن (0..2)
             $v = (int) $val;
             if ($v < 0) $v = 0;
             if ($v > 2) $v = 2;
@@ -149,10 +150,13 @@ class TestController extends Controller
                 return back()->withErrors(['msg' => 'تعذر حفظ النتيجة: '.$e->getMessage()])->withInput();
             }
 
+            // ✅ اسمح بعرض نتائجه فورًا (بدون رقم بالرابط)
+            Session::put('viewer_student_id', $studentId);
+
             // نظّف الجلسة
             Session::forget(['student_registration_data', 'test_type_for_test']);
 
-            return redirect()->route('results.show', ['student_id' => $studentId])
+            return redirect()->route('results.show')
                 ->with('success', 'تم حفظ نتيجتك.');
 
         } else {
@@ -163,7 +167,7 @@ class TestController extends Controller
                     ->withErrors(['msg' => 'تعذر تحديد الطالب لهذه الجلسة. ابدأ من صفحة البحث.']);
             }
 
-            // تأكيد وجود سجل قبلي (أمان إضافي)
+            // تأكيد وجود سجل قبلي
             $hasPre = DB::table('test_results')->where('student_id', $studentId)->exists();
             if (!$hasPre) {
                 return redirect()->route('post-test.lookup')
@@ -199,7 +203,10 @@ class TestController extends Controller
                 return back()->withErrors(['msg' => 'تعذر حفظ النتيجة البعدية: '.$e->getMessage()])->withInput();
             }
 
-            // تحقّق فعلي من وجود أي قيمة بعدية قبل التوجيه
+            // ✅ اسمح بعرض تقريره/نتيجته فورًا
+            Session::put('viewer_student_id', $studentId);
+
+            // تحقّق من وجود أي قيمة بعدية
             $hasAnyPost = DB::table('test_results')
                 ->where('student_id', $studentId)
                 ->where(function ($q) {
@@ -216,12 +223,12 @@ class TestController extends Controller
             // نظّف مفاتيح الجلسة الخاصة بالاختبار
             Session::forget(['student_id_for_test', 'test_type_for_test']);
 
-            // بعد البعدي: تقرير التطوّر إن وُجدت قيم، وإلا النتائج العادية (حالة نادرة)
+            // بعد البعدي: تقرير التطوّر إن وُجدت قيم، وإلا النتائج العادية
             return $hasAnyPost
-                ? redirect()->route('growth.report', ['student_id' => $studentId])
+                ? redirect()->route('growth.report')
                     ->with('success', 'تم حفظ نتيجتك البعدية — هذا تقرير تطوّرك 🎯')
-                : redirect()->route('results.show', ['student_id' => $studentId])
-                    ->with('info', 'تم الحفظ، لكن لم تُسجَّل قيم بعدية لسبب ما؛ نعرض نتيجتك الحالية.');
+                : redirect()->route('results.show')
+                    ->with('info', 'تم الحفظ، لكن لم تُسجَّل قيم بعدية؛ نعرض نتيجتك الحالية.');
         }
     }
 }

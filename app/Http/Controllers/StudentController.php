@@ -24,6 +24,16 @@ class StudentController extends Controller
     }
 
     /**
+     * مساعد: الحصول على معرف الطالب من الجلسة للعرض العام، أو 403.
+     */
+    protected function viewerIdOrAbort(): int
+    {
+        $id = (int) (Session::get('viewer_student_id') ?? 0);
+        abort_unless($id > 0, 403, 'غير مصرح لك بعرض هذه النتائج.');
+        return $id;
+    }
+
+    /**
      * نموذج التسجيل (اختبار قبلي)
      */
     public function showRegistrationForm()
@@ -99,6 +109,9 @@ class StudentController extends Controller
 
         $student = Student::where('whatsapp_number', $validatedData['whatsapp_number'])->first();
 
+        /** ✅ خزّن معرف الطالب للعرض (يحل مشكلة 403 للنتائج/التقرير) */
+        Session::put('viewer_student_id', $student->id);
+
         // ✅ لازم يكون عنده اختبار قبلي (سجل نتائج موجود)
         $result = $student->testResult;
         if (!$result) {
@@ -107,7 +120,7 @@ class StudentController extends Controller
             ])->withInput();
         }
 
-        // ✅ إذا الطالب أنهى البعدي سابقًا → أرسله لتقرير التطور مباشرة
+        // ✅ إذا الطالب أنهى البعدي سابقًا → أرسله لتقرير التطور مباشرة (بدون ID في الرابط)
         $hasPost = collect([
             $result->post_score_social,
             $result->post_score_visual,
@@ -120,19 +133,9 @@ class StudentController extends Controller
         ])->filter(fn($v) => !is_null($v))->isNotEmpty();
 
         if ($hasPost) {
-            return redirect()->route('growth.report', $student->id)
+            return redirect()->route('growth.report')
                 ->with('info', 'لقد أكملت الاختبار البعدي سابقًا — هذا تقرير تطوّرك.');
         }
-
-        // ✅ عند الفتح العام، نتجاهل post_test_allowed الفردي ونسمح للجميع
-        // لو حبيت تفعّل الشرط الفردي حتى مع الفتح العام، أزل التعليق أدناه:
-        /*
-        if (Schema::hasColumn('students', 'post_test_allowed') && !$student->post_test_allowed) {
-            return back()
-                ->withErrors(['whatsapp_number' => 'لم يتم فتح الاختبار البعدي لهذا الطالب بعد.'])
-                ->withInput();
-        }
-        */
 
         // ✅ تجهيز الجلسة للاختبار البعدي
         Session::put('student_id_for_test', $student->id);
@@ -239,6 +242,7 @@ class StudentController extends Controller
             $key = $typeMap[$id] ?? null;
             if (!$key) continue;
 
+            // ✅ تصحيح السهو: score_ وليس "score "
             $pre  = $result->{'score_' . $key} ?? 0;
             $post = $result->{'post_score_' . $key} ?? null;
 
@@ -252,7 +256,8 @@ class StudentController extends Controller
         }
 
         if (!$hasAnyPost) {
-            return redirect()->route('results.show', $student->id)
+            // ✅ المسار الجديد بدون ID
+            return redirect()->route('results.show')
                 ->with('info', 'لا يمكن عرض تقرير التطوّر قبل إكمال الاختبار البعدي.');
         }
 
@@ -435,5 +440,25 @@ class StudentController extends Controller
 
         $fileName = 'Masar-Results-' . ($student->full_name ?? 'Student') . '.pdf';
         return $pdf->download($fileName);
+    }
+
+    /* ===================== دوال بدون معرف في الرابط ===================== */
+
+    public function showOwnResults()
+    {
+        $id = $this->viewerIdOrAbort();
+        return $this->showStudentResults($id);
+    }
+
+    public function showOwnGrowthReport()
+    {
+        $id = $this->viewerIdOrAbort();
+        return $this->showGrowthReport($id);
+    }
+
+    public function exportOwnPdf()
+    {
+        $id = $this->viewerIdOrAbort();
+        return $this->exportPdf($id);
     }
 }

@@ -22,12 +22,13 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => 'required|email',
+            'email'    => 'required|email',
             'password' => 'required',
         ]);
 
         if (Auth::attempt($credentials)) {
-            if (Auth::user()->role !== 'admin') {
+            // السماح للمسؤولين فقط
+            if ((Auth::user()->role ?? null) !== 'admin') {
                 Auth::logout();
                 return back()->withErrors([
                     'email' => 'هذه الصفحة مخصصة للمسؤولين فقط.',
