@@ -21,7 +21,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <!-- FA v6.5.2 لدعم fa-xmark -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
 
   @verbatim
   <style>
@@ -29,7 +30,7 @@
     *{margin:0;padding:0;box-sizing:border-box}
     html{scroll-behavior:smooth}
     body{font-family:'Cairo',sans-serif;overflow-x:hidden;background:var(--surface);color:var(--text)}
-    img{max-width:100%;height:auto}
+    img{max-width:100%;height:auto;display:block}
 
     :root{
       --brand:#e67e22;
@@ -54,6 +55,11 @@
       --hero-a:#f39c12;
       --hero-b:#e67e22;
       --hero-c:#d35400;
+
+      /* ===== Mobile hardening vars ===== */
+      --nav-h-desktop:92px;
+      --nav-h-mobile:78px;
+      --mobile-cta-h:56px;
     }
     [data-theme="dark"]{
       --surface:#121212;
@@ -95,15 +101,13 @@
 
     .logo{font-size:1.6rem;font-weight:800;color:#fffbf8;text-decoration:none;display:flex;align-items:center;gap:10px;white-space:nowrap}
     .logo i{font-size:1.8rem}
-    /* تحجيم الشعار العلوي (راعي) */
-    .sponsor-logo-top{height:56px;width:auto;object-fit:contain;display:block;margin:0}
 
     .nav-links{display:flex;list-style:none;gap:30px;align-items:center}
     .nav-links a{text-decoration:none;color:var(--nav-text);font-weight:700;letter-spacing:.2px;transition:all .3s ease;position:relative}
     .nav-links a:hover{color:var(--brand-2);transform:translateY(-2px)}
     .nav-links a::after{content:'';position:absolute;bottom:-5px;left:0;width:0;height:2px;background:var(--brand-2);transition:width .3s ease}
     .nav-links a:hover::after{width:100%}
-    .nav-toggle{display:none;border:0;background:transparent;color:var(--nav-text);font-size:1.4rem;cursor:pointer}
+    .nav-toggle{display:none;border:0;background:transparent;color:var(--nav-text);font-size:1.4rem;cursor:pointer;z-index:1002}
 
     /* Theme toggle */
     .theme-toggle{border:0;background:transparent;cursor:pointer;padding:6px;border-radius:999px;line-height:0}
@@ -146,7 +150,6 @@
     @keyframes particle-float{0%{transform:translateY(100vh) rotate(0);opacity:0}10%,90%{opacity:1}100%{transform:translateY(-100px) rotate(360deg);opacity:0}}
 
     .hero-content{text-align:center;color:#fff;z-index:2;position:relative;max-width:900px;padding:0 20px}
-    /* باستخدام clamp لتكييف العناوين على كل الشاشات */
     .hero-title{font-size:clamp(28px,7.2vw,64px);font-weight:900;margin-bottom:14px;text-shadow:2px 2px 4px rgba(0,0,0,.3);animation:slideInUp 1s ease-out}
     .hero-subtitle{font-size:clamp(15px,3.8vw,22px);margin-bottom:16px;opacity:.95;font-weight:700;animation:slideInUp 1s ease-out .2s both}
     .hero-description{font-size:clamp(14px,3.5vw,18px);margin-bottom:26px;opacity:.96;line-height:1.9;animation:slideInUp 1s ease-out .4s both}
@@ -188,6 +191,9 @@
     .ack-card{background:var(--surface-2);border-radius:18px;box-shadow:var(--shadow-md);overflow:hidden;transition:transform .25s ease,box-shadow .25s ease,border .25s ease;border:1px solid var(--border);padding:22px}
     .ack-card:hover{transform:translateY(-6px);box-shadow:0 16px 50px rgba(0,0,0,.12)}
     .ack-head{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+    /* مكان شعار الوزارة داخل البطاقة */
+    .ministry-logo{width:64px;height:auto;border-radius:14px;box-shadow:inset 0 0 0 2px #f3f3f3;background:#fff;padding:6px}
+    [data-theme="dark"] .ministry-logo{box-shadow:inset 0 0 0 2px #1f1f1f;background:#0f0f0f}
     .ack-icon{width:48px;height:48px;border-radius:14px;background:#fff;display:grid;place-items:center;box-shadow:inset 0 0 0 2px #f3f3f3}
     [data-theme="dark"] .ack-icon{background:#0f0f0f;box-shadow:inset 0 0 0 2px #1f1f1f}
     .ack-title{font-size:1.1rem;font-weight:900;color:var(--text)}
@@ -254,13 +260,11 @@
       .nav-center{order:2;flex-grow:1;justify-content:flex-start}
       .nav-left{order:1}.nav-right{order:3}
       .mobile-cta{display:block}
-      .sponsor-logo-top{height:48px}
     }
     @media (max-width:576px){
       .nav-container{padding:0 12px;height:78px}
       .logo{font-size:1.25rem}
       .logo i{font-size:1.35rem}
-      .sponsor-logo-top{height:32px} /* ↓ الشعار أصغر للموبايل */
       .hero-section{padding-top:78px}
       .cta-buttons{flex-direction:column;align-items:stretch}
       .btn{width:100%}
@@ -272,6 +276,81 @@
       *{scroll-behavior:auto!important}
       .hero-section::before,.particle,.fade-in,.btn::before{animation:none!important;transition:none!important}
     }
+
+    /* ====== Mobile fixes ====== */
+    #home,#features,#ack,#testimonials,#faq,#contact,
+    #ministry,#coordinator,#trainer,#team{scroll-margin-top:var(--nav-h-desktop)}
+    @media (max-width:576px){
+      #home,#features,#ack,#testimonials,#faq,#contact,
+      #ministry,#coordinator,#trainer,#team{scroll-margin-top:calc(var(--nav-h-mobile) + 8px)}
+    }
+
+    .hero-section{padding-top:var(--nav-h-desktop)}
+    @media (max-width:576px){.hero-section{padding-top:var(--nav-h-mobile)}}
+
+    /* قائمة الجوال المُحسّنة */
+    @media (max-width:992px){
+      .nav-links{
+        position:fixed; inset:var(--nav-h-mobile) 0 0 0;
+        background:rgba(0,0,0,.75); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px);
+        padding:18px 10px; display:none; flex-direction:column; gap:12px; z-index:1001;
+        align-items:center; overflow:auto;
+      }
+      .nav-links li{width:100%; display:flex; justify-content:center}
+      .nav-links a{
+        display:block; width:min(520px, calc(100% - 24px));
+        text-align:center; color:#fff!important; font-size:1.05rem; font-weight:800;
+        padding:14px 16px; border-radius:14px;
+        background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12);
+      }
+      body.nav-open .nav-links{display:flex}
+      body.nav-open{overflow:hidden}
+    }
+
+    /* شريط CTA السفلي (مُعطّل عند فتح القائمة/قرب الفوتر) */
+    @media (max-width:992px){
+      body{padding-bottom:calc(var(--mobile-cta-h) + 16px + env(safe-area-inset-bottom))}
+      .mobile-cta{
+        display:block!important; position:fixed; right:0; left:0; bottom:0;
+        padding-bottom:calc(10px + env(safe-area-inset-bottom));
+        transition:transform .25s ease; will-change:transform;
+      }
+      .wa-float{bottom:calc(var(--mobile-cta-h) + 22px + env(safe-area-inset-bottom))}
+      body.nav-open .mobile-cta{transform:translateY(120%); pointer-events:none}
+      body.hide-cta .mobile-cta{transform:translateY(120%); pointer-events:none}
+    }
+    /* ===== Ministry logo big & centered ===== */
+.ack-head--ministry{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  margin-bottom:12px;
+  text-align:center;
+}
+
+/* حجم الشعار كبير وواضح */
+.ministry-logo{
+  width:300px;       /* كبّر/صغّر على ذوقك */
+  height:auto;
+  background:transparent;
+  box-shadow:none;
+  border-radius:16px;
+}
+
+.ministry-caption{
+  font-weight:900;
+  font-size:clamp(20px,3.8vw,28px);
+  color:var(--text);
+  line-height:1.2;
+}
+
+@media (max-width:576px){
+  .ministry-logo{width:140px}
+  .ministry-caption{font-size:clamp(18px,4.4vw,24px)}
+}
+
   </style>
   @endverbatim
 
@@ -307,13 +386,13 @@
   <nav class="navbar" id="navbar">
     <div class="nav-container">
       <div class="nav-left">
-        <a href="{{ route('landing') }}" class="logo">
+        <a href="{{ route('landing') }}" class="logo" aria-label="العودة للرئيسية">
           <i class="fas fa-brain" aria-hidden="true"></i> مشروع مسار
         </a>
       </div>
 
       <div class="nav-center">
-        <ul class="nav-links" id="primary-nav">
+        <ul class="nav-links" id="primary-nav" aria-label="التنقل الرئيسي">
           <li><a href="#home">الرئيسية</a></li>
           <li><a href="#features">المميزات</a></li>
           <li><a href="#ack">الركائز</a></li>
@@ -343,9 +422,9 @@
             </g>
           </svg>
         </button>
-        <a href="#" title="وزارة الشباب والرياضة اليمنية">
-          <img src="{{ asset('assets/logos/moys-ye.png') }}" loading="lazy" alt="شعار وزارة الشباب والرياضة اليمنية" class="sponsor-logo-top">
-        </a>
+
+        <!-- تمت إزالة شعار الوزارة من الأعلى حسب طلبك -->
+
         <button class="nav-toggle" id="navToggle" aria-label="فتح القائمة" aria-controls="primary-nav" aria-expanded="false">
           <i class="fas fa-bars"></i>
         </button>
@@ -430,23 +509,24 @@
         <h2 class="section-title fade-in">الركائز الداعمة</h2>
         <p class="section-subtitle fade-in">تعريف موجز بالجهات والأشخاص الذين يقفون خلف نجاح هذه الدورة.</p>
 
-        <div class="ack-grid">
-          <article class="ack-card fade-in" id="ministry">
-            <div class="ack-head">
-              <div class="ack-icon"><i class="fas fa-landmark" style="color:#e67e22;font-size:1.6rem" aria-hidden="true"></i></div>
-              <h3 class="ack-title">وزارة الشباب والرياضة</h3>
-            </div>
-            <div class="ack-body">
-              <p>
-                برعاية معالي وزير الشباب والرياضة <strong>نايف البكري</strong>، تبذل الوزارة جهودًا حثيثة في إصلاح وتطوير هذه الدورة التدريبية المتقدمة
-                لبناء جيل واعٍ ومؤهل أكاديميًّا ومهنيًّا.
-              </p>
-            </div>
-          </article>
+       <article class="ack-card fade-in" id="ministry">
+  <div class="ack-head ack-head--ministry">
+    <img class="ministry-logo" src="{{ asset('assets/logos/moys-ye.png') }}"
+         alt="شعار وزارة الشباب والرياضة اليمنية" width="160" height="160">
+    <div class="ministry-caption">وزارة الشباب والرياضة</div>
+  </div>
+  <div class="ack-body">
+    <p>
+      برعاية معالي وزير الشباب والرياضة <strong>نايف البكري</strong>، تبذل الوزارة جهودًا حثيثة في إصلاح وتطوير هذه الدورة التدريبية المتقدمة
+      لبناء جيل واعٍ ومؤهل أكاديميًّا ومهنيًّا.
+    </p>
+  </div>
+</article>
+
 
           <article class="ack-card fade-in" id="coordinator">
             <div class="ack-head">
-              <div class="ack-icon"><i class="fas fa-user-tie" style="color:#e67e22;font-size:1.6rem" aria-hidden="true"></i></div>
+              <div class="ack-icon"><i class="fas fa-user-tie" style="color:#e67e22;font-size:1.4rem" aria-hidden="true"></i></div>
               <h3 class="ack-title">المنسّق</h3>
             </div>
             <div class="ack-body">
@@ -456,7 +536,7 @@
 
           <article class="ack-card fade-in" id="trainer">
             <div class="ack-head">
-              <div class="ack-icon"><i class="fas fa-chalkboard-teacher" style="color:#e67e22;font-size:1.6rem" aria-hidden="true"></i></div>
+              <div class="ack-icon"><i class="fas fa-chalkboard-teacher" style="color:#e67e22;font-size:1.4rem" aria-hidden="true"></i></div>
               <h3 class="ack-title">مدرب الدورة</h3>
             </div>
             <div class="ack-body">
@@ -468,7 +548,7 @@
 
           <article class="ack-card fade-in" id="team">
             <div class="ack-head">
-              <div class="ack-icon"><i class="fas fa-code" style="color:#e67e22;font-size:1.6rem" aria-hidden="true"></i></div>
+              <div class="ack-icon"><i class="fas fa-code" style="color:#e67e22;font-size:1.4rem" aria-hidden="true"></i></div>
               <h3 class="ack-title">فريق التنفيذ: ديفو تك</h3>
             </div>
             <div class="ack-body">
@@ -545,7 +625,7 @@
     </section>
   </main>
 
-  <!-- Footer (merged sponsor note here) -->
+  <!-- Footer -->
   <footer class="footer" id="contact">
     <div class="container">
       <div class="footer-nav-tags">
@@ -572,9 +652,9 @@
             <li><i class="fas fa-map-marker-alt" aria-hidden="true"></i> مأرب، اليمن</li>
           </ul>
           <div class="social-links">
-            <a href="#" class="social-link" aria-label="Facebook"><i class="fab fa-facebook-f" aria-hidden="true"></i></a>
-            <a href="#" class="social-link" aria-label="Twitter"><i class="fab fa-twitter" aria-hidden="true"></i></a>
-            <a href="#" class="social-link" aria-label="Instagram"><i class="fab fa-instagram" aria-hidden="true"></i></a>
+            <a href="#" class="social-link" aria-label="Facebook" rel="noopener"><i class="fab fa-facebook-f" aria-hidden="true"></i></a>
+            <a href="#" class="social-link" aria-label="Twitter" rel="noopener"><i class="fab fa-twitter" aria-hidden="true"></i></a>
+            <a href="#" class="social-link" aria-label="Instagram" rel="noopener"><i class="fab fa-instagram" aria-hidden="true"></i></a>
           </div>
         </div>
 
@@ -601,13 +681,15 @@
     <i class="fa-brands fa-whatsapp" aria-hidden="true"></i>
   </a>
 
-  <!-- Mobile CTA bar -->
+  <!-- Mobile CTA bar (معلّق) -->
+  <!--
   <div class="mobile-cta" role="region" aria-label="أزرار سريعة للجوال">
     <div class="row">
       <a href="{{ route('register') }}" class="btn btn-primary" data-evt="cta_pre_bottom"><i class="fas fa-play"></i> ابدأ الاختبار</a>
       <a href="{{ route('post-test.lookup') }}" class="btn btn-secondary" data-evt="cta_post_bottom"><i class="fas fa-redo-alt"></i> الاختبار البعدي</a>
     </div>
   </div>
+  -->
 
   <!-- JSON-LD: FAQPage -->
   <script type="application/ld+json">
@@ -640,59 +722,110 @@
     reflectPreference();
 
     const onClick=()=>{ theme.value = theme.value==='light' ? 'dark' : 'light'; setPreference(); };
-    window.onload=()=>{
+    window.addEventListener('DOMContentLoaded', ()=>{
       reflectPreference();
-      document.querySelector('#theme-toggle').addEventListener('click', onClick);
-    };
+      document.querySelector('#theme-toggle')?.addEventListener('click', onClick);
+    });
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', ({matches:isDark})=>{
       theme.value = isDark ? 'dark' : 'light'; setPreference();
     });
 
-    /* ================= Mobile nav & navbar scroll ================= */
-    const navToggle=document.getElementById('navToggle');
-    const navbar=document.getElementById('navbar');
-    const body=document.body;
-    navToggle.addEventListener('click',()=>{
-      body.classList.toggle('nav-open');
-      const isOpen=body.classList.contains('nav-open');
-      navToggle.setAttribute('aria-expanded',isOpen);
-      navToggle.querySelector('i').classList.toggle('fa-bars',!isOpen);
-      navToggle.querySelector('i').classList.toggle('fa-times',isOpen);
+    /* ============ Mobile nav & navbar scroll ============ */
+    const navToggle = document.getElementById('navToggle');
+    const navbar    = document.getElementById('navbar');
+    const bodyEl    = document.body;
+
+    function setNav(open){
+      bodyEl.classList.toggle('nav-open', open);
+      navToggle?.setAttribute('aria-expanded', String(open));
+      const icon = navToggle?.querySelector('i');
+      if(icon){ icon.classList.toggle('fa-bars', !open); icon.classList.toggle('fa-xmark', open); }
+    }
+
+    navToggle?.addEventListener('click', ()=> setNav(!bodyEl.classList.contains('nav-open')));
+
+    // إغلاق القائمة عند الضغط على أي رابط داخلها
+    document.getElementById('primary-nav')?.addEventListener('click', (e)=>{
+      const link = e.target.closest('a[href^="#"]');
+      if(link){ setNav(false); }
     });
+
+    // إغلاق بـ Esc
+    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ setNav(false); } });
+
+    // لون النافبار عند التمرير
     const onScroll=()=>{ if(window.scrollY>10){ navbar.classList.add('scrolled') } else { navbar.classList.remove('scrolled') } };
     window.addEventListener('scroll', onScroll); onScroll();
 
-    /* ================= Smooth anchors ================= */
+    /* ============ Smooth anchors ============ */
     document.querySelectorAll('a[href^="#"]').forEach(a=>{
       a.addEventListener('click',e=>{
         const href=a.getAttribute('href'); if(!href||href==='#') return;
-        e.preventDefault(); const t=document.querySelector(href);
-        if(t){ t.scrollIntoView({behavior:'smooth',block:'start'}); }
-        body.classList.remove('nav-open'); navToggle.setAttribute('aria-expanded','false');
-        navToggle.querySelector('i').classList.add('fa-bars'); navToggle.querySelector('i').classList.remove('fa-times');
+        e.preventDefault();
+        const t=document.querySelector(href); if(t){ t.scrollIntoView({behavior:'smooth',block:'start'}); }
+        setNav(false);
       });
     });
 
-    /* ================= Fade-in on scroll ================= */
-    const observer=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible')}})},{threshold:.1,rootMargin:'0px 0px -50px 0px'});
-    document.querySelectorAll('.fade-in').forEach(el=>observer.observe(el));
+    /* ============ إخفاء شريط CTA عند الاقتراب من الفوتر ============ */
+    const footer = document.querySelector('footer.footer');
+    if('IntersectionObserver' in window && footer){
+      const ctaObserver = new IntersectionObserver(entries=>{
+        entries.forEach(e=>{ document.body.classList.toggle('hide-cta', e.isIntersecting); });
+      }, { rootMargin: '0px 0px -45% 0px', threshold: 0 });
+      ctaObserver.observe(footer);
+    }
 
-    /* ================= Stats counters ================= */
-    function animateCounter(el,target){let c=0;const inc=Math.max(1,target/100);const timer=setInterval(()=>{c+=inc;if(c>=target){c=target;clearInterval(timer)}el.textContent=Math.floor(c)},20)}
-    const statsObserver=new IntersectionObserver(entries=>{entries.forEach(entry=>{if(entry.isIntersecting){const counter=entry.target.querySelector('.stat-number');const target=parseInt(counter.getAttribute('data-count'));animateCounter(counter,target);statsObserver.unobserve(entry.target)}})},{threshold:.5});
-    document.querySelectorAll('.stat-item').forEach(it=>statsObserver.observe(it));
+    /* ================= Fade-in on scroll ================= */
+    const observer = 'IntersectionObserver' in window
+      ? new IntersectionObserver(entries=>{
+          entries.forEach(entry=>{
+            if(entry.isIntersecting){ entry.target.classList.add('visible') }
+          })
+        },{threshold:.1,rootMargin:'0px 0px -50px 0px'})
+      : null;
+    if(observer){ document.querySelectorAll('.fade-in').forEach(el=>observer.observe(el)); }
+    else{ document.querySelectorAll('.fade-in').forEach(el=>el.classList.add('visible')); }
+
+    /* ================= Stats counters (rAF) ================= */
+    function animateCounter(el,target){
+      let start=0, last=performance.now();
+      function step(now){
+        const dt = now - last; last = now;
+        start += Math.max(1, target/100) * (dt/20);
+        if(start >= target){ el.textContent = target; return; }
+        el.textContent = Math.floor(start);
+        requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+    const statsObserver=('IntersectionObserver' in window)
+      ? new IntersectionObserver(entries=>{
+          entries.forEach(entry=>{
+            if(entry.isIntersecting){
+              const counter=entry.target.querySelector('.stat-number');
+              const target=parseInt(counter.getAttribute('data-count'),10);
+              animateCounter(counter,target);
+              statsObserver.unobserve(entry.target);
+            }
+          })
+        },{threshold:.5})
+      : null;
+    if(statsObserver){ document.querySelectorAll('.stat-item').forEach(it=>statsObserver.observe(it)); }
+    else{ document.querySelectorAll('.stat-number').forEach(el=>el.textContent=el.getAttribute('data-count')); }
 
     /* ================= FAQ accordion ================= */
     document.querySelectorAll('.faq-item').forEach(item=>{
       const q=item.querySelector('.faq-q');
-      q.addEventListener('click',()=>{const ex=item.getAttribute('aria-expanded')==='true';
+      q.addEventListener('click',()=>{
+        const ex=item.getAttribute('aria-expanded')==='true';
         document.querySelectorAll('.faq-item').forEach(i=>i.setAttribute('aria-expanded','false'));
         item.setAttribute('aria-expanded',String(!ex));
       });
     });
 
     /* ================= CTA tracking (optional) ================= */
-    function track(label){ if(typeof gtag==='function'){ gtag('event','click',{event_category:'CTA',event_label:label}) } else { console.log('[track]',label) } }
+    function track(label){ if(typeof gtag==='function'){ try{ gtag('event','click',{event_category:'CTA',event_label:label}) }catch(e){} } else { console.log('[track]',label) } }
     document.querySelectorAll('[data-evt]').forEach(el=>{ el.addEventListener('click',()=>track(el.getAttribute('data-evt'))); });
   </script>
 </body>
